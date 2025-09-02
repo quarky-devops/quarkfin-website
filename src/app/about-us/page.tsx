@@ -13,7 +13,7 @@ const teamMembers = [
         twitter: "https://x.com/bidyabibhu",
     },
     {
-        name: "Sachinn",
+        name: "Sachinn M",
         role: "GTM",
         image: "/logos/profile-1.png",
         linkedin: "https://www.linkedin.com/in/sachinnm/",
