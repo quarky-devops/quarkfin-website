@@ -133,8 +133,8 @@ export default function MainComponent() {
 
     // hydrate from URL on first render
     useEffect(() => {
-        const qInterval = search.get("interval");
-        const qCurrency = search.get("currency");
+        const qInterval = search!.get("interval");
+        const qCurrency = search!.get("currency");
         if (isInterval(qInterval)) setIsYearly(qInterval === "yearly");
         if (isCurrency(qCurrency)) setCurrency(qCurrency);
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -142,7 +142,7 @@ export default function MainComponent() {
 
     // keep URL in sync when toggles change
     useEffect(() => {
-        const params = new URLSearchParams(search.toString());
+        const params = new URLSearchParams(search!.toString());
         const desiredInterval = isYearly ? "yearly" : "monthly";
         let changed = false;
 
@@ -478,7 +478,7 @@ export default function MainComponent() {
                             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Frequently Asked
                                 Questions</h2>
                             <p className="text-lg text-left text-gray-600">
-                                Got questions? We've got answers. If you can't find what you're looking for, contact our
+                                Got questions? We&apos;ve got answers. If you can&apos;t find what you&apos;re looking for, contact our
                                 support team.
                             </p>
                         </div>
