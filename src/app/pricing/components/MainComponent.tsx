@@ -1,13 +1,21 @@
 "use client"
 
-import {useState} from "react"
+import {useEffect, useState, Fragment} from "react"
 import {Briefcase, Check, ChevronDown, ChevronUp, Star, TrendingUp, X} from "lucide-react"
 import Navbar from "@/app/components/Navbar";
 import Footer from "@/components/Footer";
 import Link from "next/link";
+import {useRouter, useSearchParams} from "next/navigation";
 
 const currencyRates = {USD: 1, INR: 83, GBP: 0.79, EUR: 0.859}
 const currencySymbols = {USD: "$", INR: "₹", GBP: "£", EUR: "€"}
+
+// helpers for URL params
+const ALLOWED_PLAN_NAMES = ["Free", "Startup", "Growth"] as const;
+const toParamPlan = (name: string) => name.toLowerCase(); // "Free" -> "free"
+const isInterval = (v: string | null): v is "monthly" | "yearly" => v === "monthly" || v === "yearly";
+const isCurrency = (v: string | null): v is "USD" | "INR" | "GBP" | "EUR" =>
+  v === "USD" || v === "INR" || v === "GBP" || v === "EUR";
 
 const plans = [
     {
@@ -113,12 +121,42 @@ const faqs = [
 
 
 export default function MainComponent() {
+    const search = useSearchParams();
+    const router = useRouter();
+
     const [isYearly, setIsYearly] = useState(false)
     const [currency, setCurrency] = useState<'USD' | 'INR' | 'GBP' | 'EUR'>('USD')
 
     const [openIndex, setOpenIndex] = useState<number | null>(null)
     const [transactions, setTransactions] = useState(5000);
     const [onboards, setOnboards] = useState(50);
+
+    // hydrate from URL on first render
+    useEffect(() => {
+        const qInterval = search.get("interval");
+        const qCurrency = search.get("currency");
+        if (isInterval(qInterval)) setIsYearly(qInterval === "yearly");
+        if (isCurrency(qCurrency)) setCurrency(qCurrency);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // keep URL in sync when toggles change
+    useEffect(() => {
+        const params = new URLSearchParams(search.toString());
+        const desiredInterval = isYearly ? "yearly" : "monthly";
+        let changed = false;
+
+        if (params.get("interval") !== desiredInterval) {
+            params.set("interval", desiredInterval);
+            changed = true;
+        }
+        if (params.get("currency") !== currency) {
+            params.set("currency", currency);
+            changed = true;
+        }
+        if (changed) router.replace(`?${params.toString()}`);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isYearly, currency]);
 
     const convert = (usd: number) => usd * currencyRates[currency]
     const money = (usd: number | string) =>
@@ -144,6 +182,7 @@ export default function MainComponent() {
         recommendedPlan = 'The <strong>Growth Plan</strong> offers the best value for this usage.';
     }
 
+    const intervalParam = isYearly ? "yearly" : "monthly";
 
     return (
         <>
@@ -189,47 +228,54 @@ export default function MainComponent() {
 
                     {/* Pricing Cards Section */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                        {plans.map((plan) => (
-                            <div
-                                key={plan.name}
-                                className={`relative flex flex-col rounded-2xl border-2 p-6 shadow-sm transition-all hover:shadow-lg ${plan.popular ? "border-blue-500 bg-blue-50/50 scale-105" : "border-gray-200 bg-white"}`}
-                            >
-                                {plan.popular && (
-                                    <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                                        <div
-                                            className="flex items-center gap-1 bg-blue-600 text-white px-3 py-1 rounded-full text-sm font-medium">
-                                            <Star className="w-3 h-3 fill-current"/> Most Popular
+                        {plans.map((plan) => {
+                            const isSelectable = ALLOWED_PLAN_NAMES.includes(plan.name as (typeof ALLOWED_PLAN_NAMES)[number]);
+                            const hrefForCta = isSelectable
+                                ? `${plan.url}?plan=${toParamPlan(plan.name)}&interval=${intervalParam}&currency=${currency}`
+                                : plan.url;
+
+                            return (
+                                <div
+                                    key={plan.name}
+                                    className={`relative flex flex-col rounded-2xl border-2 p-6 shadow-sm transition-all hover:shadow-lg ${plan.popular ? "border-blue-500 bg-blue-50/50 scale-105" : "border-gray-200 bg-white"}`}
+                                >
+                                    {plan.popular && (
+                                        <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                                            <div
+                                                className="flex items-center gap-1 bg-blue-600 text-white px-3 py-1 rounded-full text-sm font-medium">
+                                                <Star className="w-3 h-3 fill-current"/> Most Popular
+                                            </div>
                                         </div>
-                                    </div>
-                                )}
-                                <div className="flex-grow">
-                                    <h3 className="text-xl font-bold text-gray-900 mb-2 text-left">{plan.name}</h3>
-                                    <p className="text-sm text-gray-600 mb-4 h-16 text-left">{plan.description}</p>
-                                    <div className="mb-4 text-left">
+                                    )}
+                                    <div className="flex-grow">
+                                        <h3 className="text-xl font-bold text-gray-900 mb-2 text-left">{plan.name}</h3>
+                                        <p className="text-sm text-gray-600 mb-4 h-16 text-left">{plan.description}</p>
+                                        <div className="mb-4 text-left">
                                         <span className="text-4xl font-bold text-gray-900">
                                             {money(isYearly ? plan.yearlyPrice : plan.monthlyPrice)}
                                         </span>
-                                        {typeof (isYearly ? plan.yearlyPrice : plan.monthlyPrice) === 'number' &&
-                                            <span className="text-gray-600 ml-1">/{isYearly ? "year" : "month"}</span>}
+                                            {typeof (isYearly ? plan.yearlyPrice : plan.monthlyPrice) === 'number' &&
+                                                <span className="text-gray-600 ml-1">/{isYearly ? "year" : "month"}</span>}
+                                        </div>
+                                        <ul className="space-y-3 mb-8">
+                                            {plan.features.map((feature, featureIndex) => (
+                                                <li key={featureIndex} className="flex items-start gap-3">
+                                                    <Check className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5"/>
+                                                    <span
+                                                        className="text-sm text-gray-700">{convertTopUp(feature)}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
                                     </div>
-                                    <ul className="space-y-3 mb-8">
-                                        {plan.features.map((feature, featureIndex) => (
-                                            <li key={featureIndex} className="flex items-start gap-3">
-                                                <Check className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5"/>
-                                                <span
-                                                    className="text-sm text-gray-700">{convertTopUp(feature)}</span>
-                                            </li>
-                                        ))}
-                                    </ul>
+                                    <Link href={hrefForCta}>
+                                        <button
+                                            className="cursor-pointer w-full mt-auto px-6 py-3 rounded-md font-semibold transition border border-[#2C2F8F] text-[#2C2F8F] hover:bg-[#2C2F8F] hover:text-white">
+                                            {plan.buttonText}
+                                        </button>
+                                    </Link>
                                 </div>
-                                <Link href={plan.url}>
-                                    <button
-                                        className="cursor-pointer w-full mt-auto px-6 py-3 rounded-md font-semibold transition border border-[#2C2F8F] text-[#2C2F8F] hover:bg-[#2C2F8F] hover:text-white">
-                                        {plan.buttonText}
-                                    </button>
-                                </Link>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
 
                     {/* Pay-As-You-Go Section */}
@@ -278,16 +324,16 @@ export default function MainComponent() {
                                 </thead>
                                 <tbody>
                                 {featureComparison.map((category, catIndex) => (
-                                    <>
-                                        <tr key={catIndex} className="bg-gray-200/60">
+                                    <Fragment key={`cat-${catIndex}`}>
+                                        <tr className="bg-gray-200/60">
                                             <td colSpan={5}
                                                 className="py-3 px-6 font-bold text-gray-800">{category.category}</td>
                                         </tr>
                                         {category.features.map((feature, featIndex) => (
-                                            <tr key={featIndex} className="border-t border-gray-200 bg-white">
+                                            <tr key={`feat-${catIndex}-${featIndex}`} className="border-t border-gray-200 bg-white">
                                                 <td className="py-4 px-6 font-medium text-gray-800">{feature.name}</td>
                                                 {[feature.freemium, feature.startup, feature.pro, feature.enterprise].map((value, planIndex) => (
-                                                    <td key={planIndex}
+                                                    <td key={`cell-${catIndex}-${featIndex}-${planIndex}`}
                                                         className={`py-4 px-6 text-center ${planIndex === 2 ? 'bg-blue-50/50' : ''}`}>
                                                         {typeof value === "boolean" ? (
                                                             value ?
@@ -301,7 +347,7 @@ export default function MainComponent() {
                                                 ))}
                                             </tr>
                                         ))}
-                                    </>
+                                    </Fragment>
                                 ))}
                                 </tbody>
                             </table>
